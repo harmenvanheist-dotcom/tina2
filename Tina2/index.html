@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tina 2 — Audio Chat</title>
+    <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
+  </head>
+  <body style="display:flex;justify-content:center;align-items:center;height:100vh;">
+    <div id="chat"></div>
+    <script>
+      (async () => {
+        const r = await fetch("/.netlify/functions/chatkit-session", { method: "POST" });
+        const { client_secret } = await r.json();
+        const control = await window.chatkit.createControl({
+          api: { getClientSecret: async () => client_secret },
+          audio: { input: true, output: true }
+        });
+        window.chatkit.mount(document.getElementById("chat"), {
+          control,
+          widget: "mini-chat-audio"
+        });
+      })();
+    </script>
+  </body>
+</html>
