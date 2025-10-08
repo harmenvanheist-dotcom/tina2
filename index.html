@@ -1,46 +1,50 @@
 <!doctype html>
 <html lang="nl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tina 2 — Audio Chat</title>
-  <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
-  <style>html,body{height:100%} body{display:grid;place-items:center;margin:0}</style>
-</head>
-<body>
-  <openai-chatkit id="my-chat" style="width:380px;height:640px"></openai-chatkit>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tina 2 — Audio Chat</title>
 
-  <script>
-    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-    (async () => {
-      // Wacht tot ChatKit geladen is
-      for (let i=0; i<50 && !window.openaiChatKit; i++) await sleep(100);
+    <!-- ChatKit script -->
+    <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
 
-      const el = document.getElementById('my-chat');
-      if (!window.openaiChatKit || !el) { 
-        document.body.append('Fout: ChatKit niet geladen'); 
-        return; 
-      }
+    <style>
+      html, body {height:100%;margin:0}
+      body {display:grid;place-items:center;background:#fff}
+      #status {position:fixed;top:10px;left:10px;font:14px/1.2 system-ui}
+    </style>
+  </head>
+  <body>
+    <div id="status">Laden…</div>
 
-      async function getClientSecret(current){
-        const res = await fetch('/.netlify/functions/chatkit-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ current })
+    <!-- Het element dat ChatKit rendert -->
+    <openai-chatkit id="my-chat" style="height:620px;width:360px"></openai-chatkit>
+
+    <script>
+      (async () => {
+        // wacht tot chatkit is geladen
+        for (let i = 0; i < 40 && !window.chatkit; i++) await new Promise(r => setTimeout(r, 100));
+
+        const host = location.origin;
+        const el = document.getElementById('my-chat');
+        const status = document.getElementById('status');
+
+        if (!window.chatkit || !el) { status.textContent = 'Fout: ChatKit niet geladen'; return; }
+
+        // haal clientToken (client_secret) op bij je Netlify-functie
+        const resp = await fetch('/.netlify/functions/chatkit-session', { method: 'POST' });
+        if (!resp.ok) { status.textContent = 'Fout: ' + resp.status + ' bij sessie'; return; }
+        const { client_secret } = await resp.json(); // = clientToken
+
+        // configureer ChatKit
+        el.setOptions({
+          api: { clientToken: client_secret },       // <— let ChatKit inloggen
+          audio: { input: true, output: true },      // microfoon & audio
+          widgets: { default: 'mini-chat-audio' }    // audio-widget
         });
-        if (!res.ok) throw new Error('session failed ' + res.status);
-        const { client_secret } = await res.json();
-        return client_secret;
-      }
 
-      await el.setOptions({
-        api: { getClientSecret },
-        // Audio aan (dit vervangt de oude, foutieve `widgets: "audio"` optie)
-        features: { audio: { input: true, output: true } },
-        // Start met de audio mini-chat widget
-        widget: { default: 'mini-chat-audio' }
-      });
-    })();
-  </script>
-</body>
+        status.remove();
+      })();
+    </script>
+  </body>
 </html>
