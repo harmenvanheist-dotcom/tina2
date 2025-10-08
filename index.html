@@ -1,31 +1,46 @@
 <!doctype html>
 <html lang="nl">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
-    <style> body { margin: 0 } #my-chat { display:block; height: 86vh; max-width: 420px; margin: 24px auto; } </style>
-  </head>
-  <body>
-    <openai-chatkit id="my-chat"></openai-chatkit>
-    <script>
-      (async function mount() {
-        const el = document.getElementById('my-chat');
-        for (let i = 0; i < 60 && !('setOptions' in el); i++) await new Promise(r=>setTimeout(r,200));
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tina 2 — Audio Chat</title>
+  <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
+  <style>html,body{height:100%} body{display:grid;place-items:center;margin:0}</style>
+</head>
+<body>
+  <openai-chatkit id="my-chat" style="width:380px;height:640px"></openai-chatkit>
 
-        el.setOptions({
-          api: {
-            async getClientSecret(existing) {
-              if (existing) return existing; // evt. refresh implementeren
-              const r = await fetch('/.netlify/functions/chatkit-session', { method: 'POST' });
-              const { client_secret } = await r.json();
-              return client_secret;
-            }
-          },
-          widgets: { default: 'mini-chat-audio' },
-          features: { audio: { input: true, output: true } }
+  <script>
+    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+    (async () => {
+      // Wacht tot ChatKit geladen is
+      for (let i=0; i<50 && !window.openaiChatKit; i++) await sleep(100);
+
+      const el = document.getElementById('my-chat');
+      if (!window.openaiChatKit || !el) { 
+        document.body.append('Fout: ChatKit niet geladen'); 
+        return; 
+      }
+
+      async function getClientSecret(current){
+        const res = await fetch('/.netlify/functions/chatkit-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current })
         });
-      })();
-    </script>
-  </body>
+        if (!res.ok) throw new Error('session failed ' + res.status);
+        const { client_secret } = await res.json();
+        return client_secret;
+      }
+
+      await el.setOptions({
+        api: { getClientSecret },
+        // Audio aan (dit vervangt de oude, foutieve `widgets: "audio"` optie)
+        features: { audio: { input: true, output: true } },
+        // Start met de audio mini-chat widget
+        widget: { default: 'mini-chat-audio' }
+      });
+    })();
+  </script>
+</body>
 </html>
