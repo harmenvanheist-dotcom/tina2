@@ -2,48 +2,66 @@
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tina 2 — Audio Chat</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tina 2 — Audio chat</title>
 
-    <!-- ChatKit script -->
+    <!-- Laad ChatKit runtime -->
     <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
 
     <style>
-      html, body {height:100%;margin:0}
-      body {display:grid;place-items:center;background:#fff}
-      #status {position:fixed;top:10px;left:10px;font:14px/1.2 system-ui}
+      html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .wrap { display: grid; place-items: center; height: 100%; }
+      .note { position: fixed; top: 8px; left: 10px; font-size: 12px; color: #666; }
+      openai-chatkit { width: 380px; height: 640px; }
+      @media (max-width: 420px){ openai-chatkit{ width: 100vw; height: 100vh; } }
     </style>
   </head>
   <body>
-    <div id="status">Laden…</div>
-
-    <!-- Het element dat ChatKit rendert -->
-    <openai-chatkit id="my-chat" style="height:620px;width:360px"></openai-chatkit>
+    <div class="note">Tina2 • MorgenAcademy</div>
+    <div class="wrap">
+      <!-- Web component dat ChatKit rendert -->
+      <openai-chatkit id="my-chat"></openai-chatkit>
+    </div>
 
     <script>
-      (async () => {
-        // wacht tot chatkit is geladen
-        for (let i = 0; i < 40 && !window.chatkit; i++) await new Promise(r => setTimeout(r, 100));
+      // Wacht tot chatkit.js geladen is
+      (async function boot() {
+        // kleine backoff tot script klaar is
+        for (let i = 0; i < 40 && !window.openaiChatKit; i++) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        const el = document.getElementById("my-chat");
+        if (!window.openaiChatKit || !el) {
+          document.body.insertAdjacentHTML("afterbegin", "<div style='padding:8px;color:#900'>Fout: ChatKit niet geladen</div>");
+          return;
+        }
 
-        const host = location.origin;
-        const el = document.getElementById('my-chat');
-        const status = document.getElementById('status');
+        // Helper: vraag client secret aan je Netlify Function
+        async function getClientSecret(current) {
+          // Start of refresh op basis van presence van current
+          const res = await fetch("/.netlify/functions/chatkit-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(current ? { refresh: { client_secret: current } } : {})
+          });
+          if (!res.ok) throw new Error("Session endpoint faalde: " + res.status);
+          const data = await res.json();
+          return data.client_secret;
+        }
 
-        if (!window.chatkit || !el) { status.textContent = 'Fout: ChatKit niet geladen'; return; }
-
-        // haal clientToken (client_secret) op bij je Netlify-functie
-        const resp = await fetch('/.netlify/functions/chatkit-session', { method: 'POST' });
-        if (!resp.ok) { status.textContent = 'Fout: ' + resp.status + ' bij sessie'; return; }
-        const { client_secret } = await resp.json(); // = clientToken
-
-        // configureer ChatKit
+        // Configureer ChatKit (hosted workflow)
         el.setOptions({
-          api: { clientToken: client_secret },       // <— let ChatKit inloggen
-          audio: { input: true, output: true },      // microfoon & audio
-          widgets: { default: 'mini-chat-audio' }    // audio-widget
+          api: {
+            // eerste token
+            async getClientSecret(existing) {
+              return getClientSecret(existing || null);
+            },
+          },
+          // Direct audio UI
+          input: { type: "voice" },
+          output: { type: "voice" },
+          widget: { default: "mini-chat-audio" }
         });
-
-        status.remove();
       })();
     </script>
   </body>
