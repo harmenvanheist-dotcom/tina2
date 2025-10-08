@@ -1,27 +1,26 @@
 <!DOCTYPE html><html lang="nl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tina 2</title>
-<style>html,body,#chat{height:100%}body{margin:0;display:flex;align-items:center;justify-content:center}</style>
+<style>html,body,#chat{height:100%}body{margin:0;display:flex;align-items:center;justify-content:center;font-family:sans-serif}</style>
+<script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer onerror="document.addEventListener('DOMContentLoaded',()=>{document.getElementById('chat').textContent='Fout: ChatKit script geblokkeerd/kon niet laden.'})"></script>
 </head><body>
 <div id="chat">Laden…</div>
 <script>
-function init(){(async()=>{
-  try{
-    const r=await fetch("/.netlify/functions/chatkit-session",{method:"POST"});
-    if(!r.ok) throw new Error("session "+r.status);
-    const {client_secret}=await r.json();
-    if(!window.chatkit) throw new Error("chatkit niet geladen");
-    const control=await window.chatkit.createControl({
-      api:{ getClientSecret:async()=>client_secret },
-      audio:{ input:true, output:true }
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    // wacht tot defer-script geladen is
+    if (!window.chatkit) throw new Error("chatkit script niet geladen");
+    const r = await fetch("/.netlify/functions/chatkit-session", { method: "POST" });
+    if (!r.ok) throw new Error("session " + r.status);
+    const { client_secret } = await r.json();
+    const control = await window.chatkit.createControl({
+      api: { getClientSecret: async () => client_secret },
+      audio: { input: true, output: true }
     });
-    window.chatkit.mount(document.getElementById("chat"),{ control, widget:"mini-chat-audio" });
-  }catch(e){document.getElementById("chat").innerText="Fout: "+e;}
-})();}
-// laad script en wacht tot onload
-const s=document.createElement("script");
-s.src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js";
-s.async=true; s.onload=init; s.onerror=()=>{document.getElementById("chat").innerText="ChatKit script faalde."};
-document.head.appendChild(s);
+    window.chatkit.mount(document.getElementById("chat"), { control, widget: "mini-chat-audio" });
+  } catch (e) {
+    document.getElementById('chat').textContent = "Fout: " + e.message;
+  }
+});
 </script>
 </body></html>
