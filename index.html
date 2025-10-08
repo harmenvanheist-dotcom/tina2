@@ -1,15 +1,15 @@
 <!DOCTYPE html><html lang="nl"><head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Tina 2</title>
-  <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
-  <style>html,body{height:100%}body{margin:0}#wrap{height:100%;display:grid;place-items:center}</style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tina 2</title>
+<script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" defer></script>
+<style>html,body{height:100%}body{margin:0}#wrap{height:100%;display:grid;place-items:center}</style>
 </head><body>
   <div id="wrap">
     <openai-chatkit id="my-chat" style="height:640px;width:380px"></openai-chatkit>
   </div>
   <script>
     (async () => {
-      // wacht tot de webcomponent geregistreerd is
+      // wacht tot de webcomponent is geregistreerd
       for (let i=0;i<50 && !customElements.get('openai-chatkit'); i++) {
         await new Promise(r=>setTimeout(r,200));
       }
@@ -17,18 +17,18 @@
       if (!customElements.get('openai-chatkit')) { el.textContent='Fout: ChatKit niet geladen'; return; }
 
       async function getClientSecret(current){
-        if (current) return current; // refresh later toevoegen
+        if (current) return current; // refresh later
         const r = await fetch('/.netlify/functions/chatkit-session', { method:'POST' });
         if (!r.ok) throw new Error('session '+r.status);
-        const { client_secret } = await r.json();
-        return client_secret;
+        return (await r.json()).client_secret;
       }
 
       el.setOptions({
-        api: { getClientSecret },
+        api: { getClientSecret },              // auth via jouw backend
         widgets: { default: 'mini-chat-audio' },
         audio: { input: true, output: true }
       });
+      console.log('ChatKit geconfigureerd');   // zichtbaar in Console
     })();
   </script>
 </body></html>
