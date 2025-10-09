@@ -43,14 +43,29 @@
           return;
         }
 
-        const ensureRuntime = async () => {
-          if (window.chatkit && typeof window.chatkit.createControl === "function") {
-            return window.chatkit;
+        const resolveRuntime = () => {
+          const candidates = [
+            window.ChatKit,
+            window.chatkit,
+            window.chatKit,
+          ];
+          for (const runtime of candidates) {
+            if (runtime && typeof runtime.createControl === "function") {
+              return runtime;
+            }
           }
+          return null;
+        };
+
+        const ensureRuntime = async () => {
+          const immediate = resolveRuntime();
+          if (immediate) return immediate;
+
           for (let i = 0; i < 50; i++) {
             await new Promise(r => setTimeout(r, 100));
-            if (window.chatkit && typeof window.chatkit.createControl === "function") {
-              return window.chatkit;
+            const runtime = resolveRuntime();
+            if (runtime) {
+              return runtime;
             }
           }
           throw new Error("chatkit runtime niet beschikbaar");
