@@ -5,16 +5,13 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Tina 2 — Audio chat</title>
 
-    <!-- Laad ChatKit runtime -->
-    <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
-
     <style>
       html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
       .wrap { display: grid; place-items: center; height: 100%; background: #f5f5f5; }
-      .note { position: fixed; top: 8px; left: 10px; font-size: 12px; color: #666; }
+      .note { position: fixed; top: 8px; left: 10px; font-size: 12px; color: #666; z-index: 10; }
       .error { padding: 16px; margin: 16px; background: #fee; color: #c00; border-radius: 4px; max-width: 400px; }
       .loading { padding: 16px; color: #666; }
-      #chatkit-container { width: 380px; height: 640px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      #chatkit-container { width: 380px; height: 640px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); background: white; }
       @media (max-width: 420px){ #chatkit-container{ width: 100vw; height: 100vh; border-radius: 0; } }
     </style>
   </head>
@@ -26,112 +23,81 @@
       </div>
     </div>
 
-    <script type="module">
+    <!-- Laad ChatKit ZONDER async, dan wachten we tot het klaar is -->
+    <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"></script>
+    
+    <script>
+      // Deze code draait PAS nadat chatkit.js geladen is
       (async function boot() {
         const container = document.getElementById("chatkit-container");
         
         function showError(msg) {
-          container.innerHTML = `<div class="error">${msg}</div>`;
-          console.error(msg);
-        }
-
-        // Wacht tot ChatKit beschikbaar is
-        function waitForChatKit() {
-          return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 50;
-            
-            const check = () => {
-              attempts++;
-              
-              // Check verschillende mogelijke exports
-              const runtime = window.ChatKit || window.chatkit || window.OpenAIChatKit;
-              
-              if (runtime) {
-                console.log('ChatKit runtime gevonden:', Object.keys(runtime));
-                resolve(runtime);
-                return;
-              }
-              
-              if (attempts >= maxAttempts) {
-                reject(new Error('Timeout: ChatKit runtime niet geladen na 5 seconden'));
-                return;
-              }
-              
-              setTimeout(check, 100);
-            };
-            
-            check();
-          });
-        }
-
-        // Helper: vraag client secret aan
-        async function getClientSecret(current) {
-          const res = await fetch("/.netlify/functions/chatkit-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(current ? { refresh: { client_secret: current } } : {})
-          });
-          
-          if (!res.ok) {
-            const error = await res.text();
-            throw new Error(`Session endpoint faalde (${res.status}): ${error}`);
-          }
-          
-          const data = await res.json();
-          return data.client_secret;
+          container.innerHTML = `<div class="error"><strong>Fout:</strong><br>${msg}</div>`;
+          console.error('ChatKit Error:', msg);
         }
 
         try {
-          // Wacht op ChatKit runtime
-          const ChatKit = await waitForChatKit();
+          console.log('🔍 Zoeken naar ChatKit runtime...');
+          console.log('window.ChatKit:', typeof window.ChatKit);
+          console.log('window.chatkit:', typeof window.chatkit);
+          console.log('window.OpenAIChatKit:', typeof window.OpenAIChatKit);
           
-          // Probeer verschillende initialisatie methodes
-          let control;
+          // Probeer alle mogelijke exports
+          const ChatKit = window.ChatKit || window.chatkit || window.OpenAIChatKit;
           
-          if (typeof ChatKit.createControl === 'function') {
-            // Methode 1: Direct createControl
-            control = await ChatKit.createControl({
-              api: {
-                async getClientSecret(existing) {
-                  return getClientSecret(existing || null);
-                },
-              },
-              audio: { input: true, output: true },
-            });
-          } else if (typeof ChatKit.default?.createControl === 'function') {
-            // Methode 2: Via default export
-            control = await ChatKit.default.createControl({
-              api: {
-                async getClientSecret(existing) {
-                  return getClientSecret(existing || null);
-                },
-              },
-              audio: { input: true, output: true },
-            });
-          } else {
-            throw new Error('ChatKit API niet herkend. Beschikbare methods: ' + Object.keys(ChatKit).join(', '));
+          if (!ChatKit) {
+            // Laat ALLE beschikbare objecten zien
+            const allKeys = Object.keys(window).filter(k => k.toLowerCase().includes('chat') || k.toLowerCase().includes('openai'));
+            throw new Error(`ChatKit niet gevonden. Beschikbare objecten: ${allKeys.join(', ') || 'geen'}`);
           }
 
-          // Mount widget
-          if (typeof ChatKit.mount === 'function') {
-            await ChatKit.mount(container, {
-              control,
-              widget: "mini-chat-audio",
+          console.log('✅ ChatKit gevonden!');
+          console.log('📦 Beschikbare methodes:', Object.keys(ChatKit));
+
+          // Helper functie
+          async function getClientSecret(current) {
+            console.log('🔑 Vraag client secret aan...', current ? '(refresh)' : '(nieuw)');
+            const res = await fetch("/.netlify/functions/chatkit-session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(current ? { refresh: { client_secret: current } } : {})
             });
-          } else if (typeof ChatKit.default?.mount === 'function') {
-            await ChatKit.default.mount(container, {
-              control,
-              widget: "mini-chat-audio",
-            });
-          } else {
-            throw new Error('ChatKit.mount functie niet gevonden');
+            
+            if (!res.ok) {
+              const error = await res.text();
+              throw new Error(`Session endpoint faalde (${res.status}): ${error}`);
+            }
+            
+            const data = await res.json();
+            console.log('✅ Client secret ontvangen');
+            return data.client_secret;
           }
+
+          // Maak control aan
+          console.log('🎛️ Maak ChatKit control...');
+          const control = await ChatKit.createControl({
+            api: {
+              async getClientSecret(existing) {
+                return getClientSecret(existing || null);
+              },
+            },
+            audio: { input: true, output: true },
+          });
+
+          console.log('✅ Control gemaakt');
+
+          // Mount widget
+          console.log('🚀 Mount ChatKit widget...');
+          await ChatKit.mount(container, {
+            control,
+            widget: "mini-chat-audio",
+          });
           
           console.log('✅ ChatKit succesvol geladen!');
           
         } catch (err) {
-          showError(`Fout bij laden ChatKit: ${err.message}`);
+          console.error('❌ ChatKit fout:', err);
+          showError(err.message);
         }
       })();
     </script>
