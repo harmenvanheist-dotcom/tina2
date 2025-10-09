@@ -27,12 +27,28 @@
       // Wacht tot chatkit.js geladen is
       (async function boot() {
         // kleine backoff tot script klaar is
-        for (let i = 0; i < 40 && !window.openaiChatKit; i++) {
+        const getRuntime = () =>
+          window.openaiChatKit || window.chatkit || window.ChatKit;
+
+        for (let i = 0; i < 40 && !getRuntime(); i++) {
           await new Promise(r => setTimeout(r, 100));
         }
+
+        const chatkitRuntime = getRuntime();
         const el = document.getElementById("my-chat");
-        if (!window.openaiChatKit || !el) {
+        if (!chatkitRuntime || !el) {
           document.body.insertAdjacentHTML("afterbegin", "<div style='padding:8px;color:#900'>Fout: ChatKit niet geladen</div>");
+          return;
+        }
+
+        try {
+          await customElements.whenDefined("openai-chatkit");
+        } catch (err) {
+          console.error("Kon custom element niet initialiseren", err);
+        }
+
+        if (typeof el.setOptions !== "function") {
+          document.body.insertAdjacentHTML("afterbegin", "<div style='padding:8px;color:#900'>Fout: ChatKit component niet beschikbaar</div>");
           return;
         }
 
@@ -50,18 +66,23 @@
         }
 
         // Configureer ChatKit (hosted workflow)
-        el.setOptions({
-          api: {
-            // eerste token
-            async getClientSecret(existing) {
-              return getClientSecret(existing || null);
+        try {
+          await el.setOptions({
+            api: {
+              // eerste token
+              async getClientSecret(existing) {
+                return getClientSecret(existing || null);
+              },
             },
-          },
-          // Direct audio UI
-          input: { type: "voice" },
-          output: { type: "voice" },
-          widget: { default: "mini-chat-audio" }
-        });
+            // Direct audio UI
+            input: { type: "voice" },
+            output: { type: "voice" },
+            widget: { default: "mini-chat-audio" }
+          });
+        } catch (err) {
+          console.error("Kon ChatKit configureren", err);
+          document.body.insertAdjacentHTML("afterbegin", "<div style='padding:8px;color:#900'>Fout: ChatKit configuratie mislukte</div>");
+        }
       })();
     </script>
   </body>
