@@ -18,7 +18,7 @@ function cors(origin) {
     "Access-Control-Allow-Origin": origin,
     "Vary": "Origin",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, OpenAI-Beta, OpenAI-Organization, ChatKit-Client-Version",
   };
 }
 
@@ -40,15 +40,36 @@ exports.handler = async (event) => {
   }
 
   try {
-    const body = event.body ? JSON.parse(event.body) : {};
+    const parsedBody = (() => {
+      if (!event.body) return {};
+      try {
+        const asJson = JSON.parse(event.body);
+        return typeof asJson === "object" && asJson !== null ? asJson : {};
+      } catch (parseErr) {
+        throw new Error(`invalid_json_body: ${parseErr.message}`);
+      }
+    })();
+
+    const {
+      refresh,
+      user,
+      workflow, // voorkom overschrijven van vaste workflow id
+      ...rest
+    } = parsedBody;
+
     const payload = {
       workflow: { id: WORKFLOW_ID },
-      user: "anon",              // vervang desgewenst door device/user id
+      user: typeof user === "string" && user.trim() ? user : "anon",
     };
 
     // Optioneel refresh pad
-    if (body && body.refresh && body.refresh.client_secret) {
-      payload.refresh = { client_secret: body.refresh.client_secret };
+    if (refresh && refresh.client_secret) {
+      payload.refresh = { client_secret: refresh.client_secret };
+    }
+
+    // Neem overige configuratie (zoals audio-capabilities) mee naar ChatKit
+    for (const [key, value] of Object.entries(rest)) {
+      payload[key] = value;
     }
 
     const resp = await fetch(CHATKIT_SESSIONS_URL, {
